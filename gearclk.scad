@@ -20,6 +20,10 @@ gear_width = 5;
 frame_width = 20;
 frame_height = 5;
 
+enable_gears = true;
+enable_frame = true;
+enable_bottom_holders = true;
+
 function angle(ang) = ang + angle_skew;
 
 module helper_circle() {
@@ -32,17 +36,80 @@ module helper_circle() {
  * theta = angle at which gear center should be positioned (as in 2d axes plane)
  *
  */
-module gear_at_circle(modul, tooth_number, width, bore, pressure_angle = 20, helix_angle = 0, optimized = false, theta, rotation = 0) {
+module gear_at_circle(modul, tooth_number, width, bore, pressure_angle = 20, helix_angle = 0, theta, rotation = 0, holders_at=0, holders_r=0) {
 	x = base_R * cos(theta);
 	y = base_R * sin(theta);
 
 	translate([x, y, 0])
-		gear(modul, tooth_number, width, bore, pressure_angle, helix_angle, optimized, rotation);
+		gear(modul, tooth_number, width, bore, pressure_angle, helix_angle, rotation, holders_at=holders_at, holders_r=holders_r);
 }
 
-module gear(modul, tooth_number, width, bore, pressure_angle = 20, helix_angle = 0, optimized = false, rotation=0) {
-	rotate([0, 0, rotation])
-		spur_gear(modul, tooth_number, width, bore, pressure_angle, helix_angle, optimized);
+module gear(modul, tooth_number, width, bore, pressure_angle = 20, helix_angle = 0, rotation=0, holders_at=0, holders_r=0) {
+	if (tooth_number < 16) {
+		rotate([0, 0, rotation]) {
+
+			if (holders_r != 0) {
+				difference(){
+					spur_gear(modul, tooth_number, width, bore, pressure_angle, helix_angle, false);
+					gear_holder_holes(holders_at, holders_r, width);
+				}
+			} else {
+				spur_gear(modul, tooth_number, width, bore, pressure_angle, helix_angle, false);
+			}
+		}
+	} else {
+		D = modul * tooth_number;
+		hole_D = 0.6 * D;
+		hole_R = hole_D / 2;
+
+		rotate([0, 0, rotation]) {
+			difference(){
+				spur_gear(modul, tooth_number, width, bore, pressure_angle, helix_angle, false);
+
+				translate([0, 0, -width*0.5])
+					cylinder(h=width * 2, r1=hole_R, r2=hole_R);
+			}
+
+
+			if (holders_r != 0) {
+				difference(){
+					gear_beams(bore, hole_D, width);
+					gear_holder_holes(holders_at, holders_r, width);
+				}
+			} else {
+				gear_beams(bore, hole_D, width);
+			}
+		}
+	}
+}
+
+module gear_holder_holes(holders_at, holders_r, width) {
+	translate([holders_at, 0, -width/2])
+		cylinder(h=width * 2, r1=holders_r, r2=holders_r);
+
+	translate([0, holders_at, -width/2])
+		cylinder(h=width * 2, r1=holders_r, r2=holders_r);
+
+	translate([-holders_at, 0, -width/2])
+		cylinder(h=width * 2, r1=holders_r, r2=holders_r);
+
+	translate([0, -holders_at, -width/2])
+		cylinder(h=width * 2, r1=holders_r, r2=holders_r);
+}
+
+module gear_beams(bore, hole_D, width) {
+	difference() {
+		union() {
+			translate([0, 0, width/2])
+				cube(size=[bore * 2, hole_D, width], center=true);
+			rotate([0, 0, 90])
+				translate([0, 0, width/2])
+					cube(size=[bore * 2, hole_D, width], center=true);
+		}
+
+		translate([0, 0, -width*0.5])
+			cylinder(h=width*2, r1=bore/2, r2=bore/2);
+	}
 }
 
 module bottom_frame() {
@@ -110,12 +177,12 @@ module gear_bottom_holders() {
 
 module gears() {
 	gear(gear0801_1601_m, 8, gear_width, base_bore, rotation=22.5);
-	gear_at_circle(gear0801_1601_m, 16, gear_width, base_bore, theta=angle(180));
+	gear_at_circle(gear0801_1601_m, 16, gear_width, base_bore, theta=angle(180), holders_at=15, holders_r=3);
 
 
 	color([0.7, 0, 0])
 		translate([0, 0, 2 + gear_width])
-			gear_at_circle(gear0802_1602_m, 8, gear_width, base_bore, theta=angle(180), rotation=18);
+			gear_at_circle(gear0802_1602_m, 8, gear_width, base_bore, theta=angle(180), rotation=0, holders_at=15, holders_r=3);
 	color([0.7, 0, 0])
 		translate([0, 0, 2 + gear_width])
 			gear_at_circle(gear0802_1602_m, 16, gear_width, base_bore, theta=angle(127));
@@ -171,10 +238,18 @@ module gears() {
 
 // helper_circle();
 
-color([.5, .5, .5])
-	translate([0, 0, -2 - frame_height])
-		bottom_frame();
+if(enable_frame) {
+	color([.5, .5, .5])
+		translate([0, 0, -2 - frame_height])
+			bottom_frame();
+}
 
-gears();
-gear_bottom_holders();
+if (enable_gears) {
+	gears();
+}
+
+if (enable_bottom_holders) {
+	gear_bottom_holders();
+}
+
 
